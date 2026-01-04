@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '../services/api';
 import { supabase } from '../lib/supabaseClient'; // Import supabase client
 import { Order, Product, OrderStatus } from '../types';
@@ -24,7 +24,12 @@ import {
   CreditCard,
   ExternalLink,
   Ban,
-  Flag
+  Flag,
+  Search,
+  Filter,
+  ArrowUpDown,
+  TrendingUp,
+  Clock
 } from 'lucide-react';
 import { Session } from '@supabase/supabase-js';
 
@@ -45,6 +50,11 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
+
+  // Filter & Sort State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'All'>('All');
+  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'total-desc' | 'total-asc'>('date-desc');
 
   // Order Detail Modal State
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -179,6 +189,40 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
         setIsDeleting(false);
     }
   };
+
+  // --- Filtering & Sorting Logic ---
+
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+        const matchesSearch = 
+            order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            order.customerDetails.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            order.customerDetails.email.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesStatus = statusFilter === 'All' || order.status === statusFilter;
+
+        return matchesSearch && matchesStatus;
+    }).sort((a, b) => {
+        if (sortBy === 'date-desc') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        if (sortBy === 'date-asc') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        if (sortBy === 'total-desc') return b.total - a.total;
+        if (sortBy === 'total-asc') return a.total - b.total;
+        return 0;
+    });
+  }, [orders, searchTerm, statusFilter, sortBy]);
+
+  // --- Dashboard Statistics ---
+  
+  const stats = useMemo(() => {
+      const revenue = orders
+        .filter(o => ['paid', 'completed'].includes(o.status))
+        .reduce((sum, o) => sum + o.total, 0);
+      
+      const pending = orders.filter(o => o.status === 'pending').length;
+      
+      return { revenue, pending, total: orders.length };
+  }, [orders]);
+
 
   // --- Product Management Logic ---
 
@@ -393,103 +437,196 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
             <>
                 {/* --- ORDERS TAB --- */}
                 {activeTab === 'orders' && (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 space-y-6">
-                      <h2 className="text-xl font-bold tracking-wide flex items-center gap-2">
-                        ORDER MANAGEMENT <span className="text-xs bg-white/10 px-2 py-1 rounded-full text-white/70">{orders.length}</span>
-                      </h2>
-                      
-                      <div className="bg-brand-dark border border-white/10 overflow-hidden">
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left text-sm">
-                            <thead>
-                              <tr className="bg-white/5 text-gray-400 border-b border-white/10 uppercase text-xs tracking-wider">
-                                <th className="p-4">Order ID</th>
-                                <th className="p-4">Customer</th>
-                                <th className="p-4">Total</th>
-                                <th className="p-4">Date</th>
-                                <th className="p-4">Status</th>
-                                <th className="p-4">Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                              {orders.map(order => (
-                                <tr 
-                                  key={order.id} 
-                                  onClick={() => setSelectedOrder(order)}
-                                  className="hover:bg-white/5 transition-colors cursor-pointer group"
-                                >
-                                  <td className="p-4 font-mono text-white/60 truncate max-w-[100px]" title={order.id}>
-                                    {order.id.includes('-') ? `${order.id.split('-')[0]}...` : `#${order.id}`}
-                                  </td>
-                                  <td className="p-4 font-medium">{order.customerDetails.fullName}</td>
-                                  <td className="p-4">₱{order.total.toLocaleString()}</td>
-                                  <td className="p-4 text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</td>
-                                  <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                                    <select 
-                                      value={order.status}
-                                      onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
-                                      className={`bg-transparent border border-white/20 rounded px-2 py-1 text-xs uppercase font-bold outline-none cursor-pointer
-                                        ${order.status === 'completed' ? 'text-green-400 border-green-400/30' : ''}
-                                        ${order.status === 'paid' ? 'text-blue-400 border-blue-400/30' : ''}
-                                        ${order.status === 'rejected' ? 'text-red-500 border-red-500/30' : ''}
-                                        ${order.status === 'flagged' ? 'text-orange-500 border-orange-500/30' : ''}
-                                        ${order.status === 'pending' ? 'text-yellow-400 border-yellow-400/30' : ''}
-                                      `}
-                                    >
-                                      <option value="pending" className="bg-black text-white">Pending</option>
-                                      <option value="paid" className="bg-black text-white">Paid</option>
-                                      <option value="completed" className="bg-black text-white">Completed</option>
-                                      <option value="rejected" className="bg-black text-white">Rejected</option>
-                                      <option value="flagged" className="bg-black text-white">Flagged</option>
-                                    </select>
-                                  </td>
-                                  <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                                     <button 
-                                        onClick={(e) => openDeleteOrderModal(order, e)}
-                                        className="p-2 text-gray-500 hover:text-red-500 transition-colors"
-                                        title="Delete Order"
-                                     >
-                                        <Trash2 className="w-4 h-4" />
-                                     </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
+                  <div className="space-y-8 animate-fade-in-up">
+                    
+                    {/* Stats Dashboard */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                       <div className="bg-brand-dark border border-white/10 p-6 flex items-center justify-between rounded-lg">
+                          <div>
+                            <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-1">Verified Revenue</p>
+                            <h3 className="text-2xl font-bold text-white">₱{stats.revenue.toLocaleString()}</h3>
+                          </div>
+                          <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center">
+                             <TrendingUp className="w-6 h-6 text-green-500" />
+                          </div>
+                       </div>
+                       <div className="bg-brand-dark border border-white/10 p-6 flex items-center justify-between rounded-lg">
+                          <div>
+                            <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-1">Pending Actions</p>
+                            <h3 className="text-2xl font-bold text-white">{stats.pending}</h3>
+                          </div>
+                          <div className="w-12 h-12 bg-yellow-500/10 rounded-full flex items-center justify-center">
+                             <Clock className="w-6 h-6 text-yellow-500" />
+                          </div>
+                       </div>
+                       <div className="bg-brand-dark border border-white/10 p-6 flex items-center justify-between rounded-lg">
+                          <div>
+                            <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-1">Total Orders</p>
+                            <h3 className="text-2xl font-bold text-white">{stats.total}</h3>
+                          </div>
+                          <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center">
+                             <Package className="w-6 h-6 text-blue-500" />
+                          </div>
+                       </div>
                     </div>
 
-                    <div className="space-y-6">
-                      <h2 className="text-xl font-bold tracking-wide flex items-center gap-2">
-                        ALERTS
-                        {lowStockProducts.length > 0 && <AlertTriangle className="w-5 h-5 text-red-500" />}
-                      </h2>
-                      
-                      <div className="bg-brand-dark border border-white/10 p-6">
-                        {lowStockProducts.length === 0 ? (
-                            <div className="text-gray-500 text-center py-8">
-                                All systems operational.
+                    {/* Toolbar & Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-2 space-y-6">
+                            
+                            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-brand-dark border border-white/10 p-4 rounded-lg">
+                                {/* Search */}
+                                <div className="relative w-full sm:w-64">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Search order..." 
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full bg-black border border-white/20 pl-10 pr-4 py-2 text-sm text-white focus:border-white outline-none rounded-sm transition-colors"
+                                    />
+                                </div>
+                                
+                                <div className="flex gap-2 w-full sm:w-auto overflow-x-auto">
+                                    {/* Status Filter */}
+                                    <div className="relative">
+                                        <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-500 pointer-events-none" />
+                                        <select 
+                                            value={statusFilter}
+                                            onChange={(e) => setStatusFilter(e.target.value as any)}
+                                            className="appearance-none bg-black border border-white/20 pl-9 pr-8 py-2 text-sm text-white focus:border-white outline-none rounded-sm cursor-pointer hover:bg-white/5 transition-colors"
+                                        >
+                                            <option value="All">All Status</option>
+                                            <option value="pending">Pending</option>
+                                            <option value="paid">Paid</option>
+                                            <option value="completed">Completed</option>
+                                            <option value="rejected">Rejected</option>
+                                            <option value="flagged">Flagged</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Sort */}
+                                    <div className="relative">
+                                        <ArrowUpDown className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-500 pointer-events-none" />
+                                        <select 
+                                            value={sortBy}
+                                            onChange={(e) => setSortBy(e.target.value as any)}
+                                            className="appearance-none bg-black border border-white/20 pl-9 pr-8 py-2 text-sm text-white focus:border-white outline-none rounded-sm cursor-pointer hover:bg-white/5 transition-colors"
+                                        >
+                                            <option value="date-desc">Newest</option>
+                                            <option value="date-asc">Oldest</option>
+                                            <option value="total-desc">Highest Amount</option>
+                                            <option value="total-asc">Lowest Amount</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
-                        ) : (
-                            <ul className="space-y-4">
-                                {lowStockProducts.map(p => (
-                                    <li key={p.id} className="flex gap-4 items-start border-b border-white/5 pb-4 last:border-0 last:pb-0">
-                                        <div className="w-12 h-12 bg-gray-900 flex-shrink-0">
-                                            <img src={p.image_url} alt="" className="w-full h-full object-cover opacity-70" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-sm">{p.name}</h4>
-                                            <p className="text-red-500 text-xs font-bold uppercase tracking-wider mt-1">
-                                                Only {p.stock_quantity} left
-                                            </p>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                      </div>
+                          
+                            {/* Table */}
+                            <div className="bg-brand-dark border border-white/10 overflow-hidden rounded-lg">
+                                <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead>
+                                    <tr className="bg-white/5 text-gray-400 border-b border-white/10 uppercase text-xs tracking-wider">
+                                        <th className="p-4">Order ID</th>
+                                        <th className="p-4">Customer</th>
+                                        <th className="p-4">Total</th>
+                                        <th className="p-4">Date</th>
+                                        <th className="p-4">Status</th>
+                                        <th className="p-4">Actions</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                    {filteredOrders.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} className="p-8 text-center text-gray-500">
+                                                No orders found matching your criteria.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        filteredOrders.map(order => (
+                                            <tr 
+                                            key={order.id} 
+                                            onClick={() => setSelectedOrder(order)}
+                                            className="hover:bg-white/5 transition-colors cursor-pointer group"
+                                            >
+                                            <td className="p-4 font-mono text-white/60 truncate max-w-[100px]" title={order.id}>
+                                                {order.id.includes('-') ? `${order.id.split('-')[0]}...` : `#${order.id}`}
+                                            </td>
+                                            <td className="p-4 font-medium">
+                                                {order.customerDetails.fullName}
+                                                <div className="text-[10px] text-gray-500 truncate max-w-[120px]">{order.customerDetails.email}</div>
+                                            </td>
+                                            <td className="p-4">₱{order.total.toLocaleString()}</td>
+                                            <td className="p-4 text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</td>
+                                            <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                                                <select 
+                                                value={order.status}
+                                                onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
+                                                className={`bg-transparent border border-white/20 rounded px-2 py-1 text-xs uppercase font-bold outline-none cursor-pointer
+                                                    ${order.status === 'completed' ? 'text-green-400 border-green-400/30' : ''}
+                                                    ${order.status === 'paid' ? 'text-blue-400 border-blue-400/30' : ''}
+                                                    ${order.status === 'rejected' ? 'text-red-500 border-red-500/30' : ''}
+                                                    ${order.status === 'flagged' ? 'text-orange-500 border-orange-500/30' : ''}
+                                                    ${order.status === 'pending' ? 'text-yellow-400 border-yellow-400/30' : ''}
+                                                `}
+                                                >
+                                                <option value="pending" className="bg-black text-white">Pending</option>
+                                                <option value="paid" className="bg-black text-white">Paid</option>
+                                                <option value="completed" className="bg-black text-white">Completed</option>
+                                                <option value="rejected" className="bg-black text-white">Rejected</option>
+                                                <option value="flagged" className="bg-black text-white">Flagged</option>
+                                                </select>
+                                            </td>
+                                            <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                                                <button 
+                                                    onClick={(e) => openDeleteOrderModal(order, e)}
+                                                    className="p-2 text-gray-500 hover:text-red-500 transition-colors"
+                                                    title="Delete Order"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                    </tbody>
+                                </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            <h2 className="text-xl font-bold tracking-wide flex items-center gap-2">
+                                ALERTS
+                                {lowStockProducts.length > 0 && <AlertTriangle className="w-5 h-5 text-red-500" />}
+                            </h2>
+                            
+                            <div className="bg-brand-dark border border-white/10 p-6 rounded-lg">
+                                {lowStockProducts.length === 0 ? (
+                                    <div className="text-gray-500 text-center py-8 text-sm">
+                                        <CheckCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                        Inventory is healthy.
+                                    </div>
+                                ) : (
+                                    <ul className="space-y-4">
+                                        {lowStockProducts.map(p => (
+                                            <li key={p.id} className="flex gap-4 items-start border-b border-white/5 pb-4 last:border-0 last:pb-0">
+                                                <div className="w-12 h-12 bg-gray-900 flex-shrink-0">
+                                                    <img src={p.image_url} alt="" className="w-full h-full object-cover opacity-70" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-sm">{p.name}</h4>
+                                                    <p className="text-red-500 text-xs font-bold uppercase tracking-wider mt-1">
+                                                        Only {p.stock_quantity} left
+                                                    </p>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
                     </div>
                   </div>
                 )}
