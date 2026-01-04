@@ -150,7 +150,10 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
         </section>
 
         <footer className="border-t border-white/10 py-12 text-center text-gray-600 text-sm">
-          <p>&copy; 2024 Watch and Learn. All rights reserved.</p>
+          <p>&copy; 2025 Watch and Learn. All rights reserved.</p>
+          <p>09173005367 / 09613958412</p>
+          <p>watchandlearn2025@gmail.com</p>
+
         </footer>
       </main>
 
