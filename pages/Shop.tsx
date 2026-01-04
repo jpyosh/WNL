@@ -6,7 +6,7 @@ import { CartDrawer } from '../components/CartDrawer';
 import { CheckoutModal } from '../components/CheckoutModal';
 import { ReceiptModal } from '../components/ReceiptModal';
 import { ProductDetailsModal } from '../components/ProductDetailsModal';
-import { Product, CartItem, OrderForm } from '../types';
+import { Product, CartItem, OrderForm, Order } from '../types';
 import { api } from '../services/api';
 import { sendOrderConfirmation } from '../services/email';
 import { Loader2, Watch } from 'lucide-react';
@@ -40,7 +40,9 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [currentOrderId, setCurrentOrderId] = useState<string>('');
+  
+  // Changed from storing just ID to storing full Order object to have details for email later
+  const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
 
   // Initial Data Fetch
   useEffect(() => {
@@ -124,11 +126,10 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
       // 1. Create Order in Supabase
       const order = await api.createOrder(formData, cart, cartTotal);
       
-      // 2. Send Confirmation Email (Non-blocking UI)
-      await sendOrderConfirmation(order);
-
-      // 3. Update UI State
-      setCurrentOrderId(order.id);
+      // MOVED: Email sending is now in handleReceiptUpload
+      
+      // 2. Update UI State
+      setCurrentOrder(order);
       setIsCheckoutOpen(false);
       setIsReceiptOpen(true);
       setCart([]); // Clear cart
@@ -141,7 +142,14 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
   };
 
   const handleReceiptUpload = async (file: File) => {
-    await api.uploadReceipt(currentOrderId, file);
+    if (!currentOrder) return;
+    
+    // 1. Upload receipt to bucket
+    await api.uploadReceipt(currentOrder.id, file);
+
+    // 2. Send Confirmation Email (Now that we have order + receipt uploaded)
+    // Note: The email service uses the order details we stored in state
+    await sendOrderConfirmation(currentOrder);
   };
 
   return (
@@ -222,8 +230,6 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
 
         <footer className="border-t border-white/10 py-12 text-center text-gray-600 text-sm">
           <p>&copy; 2024 Watch and Learn. All rights reserved.</p>
-                              <p>09613958412 / 09173005367</p>
-                              <p>watchandlearn2025@gmail.com</p>
         </footer>
       </main>
 
@@ -249,7 +255,7 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
 
       <ReceiptModal 
         isOpen={isReceiptOpen}
-        orderId={currentOrderId}
+        orderId={currentOrder?.id || ''}
         onUpload={handleReceiptUpload}
         onClose={() => setIsReceiptOpen(false)}
       />
