@@ -46,7 +46,6 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
     description: '',
     price: 0,
     stock_quantity: 0,
-    category: '',
   });
   const [productImageFile, setProductImageFile] = useState<File | null>(null);
   const [productImagePreview, setProductImagePreview] = useState<string | null>(null);
@@ -91,7 +90,7 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
 
   const openAddProductModal = () => {
     setEditingProduct(null);
-    setProductForm({ name: '', description: '', price: 0, stock_quantity: 0, category: '' });
+    setProductForm({ name: '', description: '', price: 0, stock_quantity: 0 });
     setProductImageFile(null);
     setProductImagePreview(null);
     setIsProductModalOpen(true);
@@ -104,7 +103,6 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
       description: product.description,
       price: product.price,
       stock_quantity: product.stock_quantity,
-      category: product.category || '',
     });
     setProductImageFile(null);
     setProductImagePreview(product.image_url);
@@ -373,7 +371,6 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                                         <tr className="bg-white/5 text-gray-400 border-b border-white/10 uppercase text-xs tracking-wider">
                                             <th className="p-4 w-20">Image</th>
                                             <th className="p-4">Name / ID</th>
-                                            <th className="p-4">Category</th>
                                             <th className="p-4">Price</th>
                                             <th className="p-4">Stock</th>
                                             <th className="p-4 text-right">Actions</th>
@@ -391,7 +388,6 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                                                     <div className="font-bold text-white">{product.name}</div>
                                                     <div className="text-xs text-gray-500 font-mono truncate max-w-[150px]">{product.id}</div>
                                                 </td>
-                                                <td className="p-4 text-gray-300">{product.category || 'General'}</td>
                                                 <td className="p-4">₱{product.price.toLocaleString()}</td>
                                                 <td className="p-4">
                                                     <span className={`font-bold ${product.stock_quantity < 3 ? 'text-red-500' : 'text-green-500'}`}>
@@ -481,16 +477,6 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                                         onChange={e => setProductForm({...productForm, name: e.target.value})}
                                         className="w-full bg-black border border-white/20 p-3 text-white focus:border-white outline-none transition-colors"
                                         placeholder="e.g. Chrono Elite"
-                                    />
-                                </div>
-                                
-                                <div>
-                                    <label className="block text-xs uppercase tracking-wider text-gray-500 mb-1">Category</label>
-                                    <input 
-                                        value={productForm.category}
-                                        onChange={e => setProductForm({...productForm, category: e.target.value})}
-                                        className="w-full bg-black border border-white/20 p-3 text-white focus:border-white outline-none transition-colors"
-                                        placeholder="e.g. Luxury, Sport"
                                     />
                                 </div>
 
