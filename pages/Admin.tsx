@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import { Order, Product } from '../types';
+import { Order, Product, OrderStatus } from '../types';
 import { 
   Lock, 
   Loader2, 
-  ExternalLink, 
   AlertTriangle, 
   ArrowLeft, 
   Package, 
@@ -13,7 +12,17 @@ import {
   Edit, 
   Trash2, 
   X,
-  Image as ImageIcon
+  Image as ImageIcon,
+  CheckCircle,
+  FileText,
+  User,
+  MapPin,
+  Phone,
+  Mail,
+  CreditCard,
+  ExternalLink,
+  Ban,
+  Flag
 } from 'lucide-react';
 
 interface AdminProps {
@@ -30,14 +39,17 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Order Detail Modal State
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
   // Product Modal State
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  // Delete Confirmation State
+  // Delete Confirmation State (Polymorphic: can be 'product' or 'order')
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{ type: 'product' | 'order', data: Product | Order } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
   // Product Form State
@@ -77,12 +89,46 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
     }
   };
 
-  const handleStatusChange = async (orderId: string, newStatus: string) => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus as any } : o));
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+    // Optimistic UI update
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+    
+    // Also update the selected order if it's open
+    if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder(prev => prev ? ({ ...prev, status: newStatus }) : null);
+    }
+
     try {
       await api.updateOrderStatus(orderId, newStatus);
+      // If completed, we should refresh inventory data to see new stock levels
+      if (newStatus === 'completed') {
+        const fetchedProducts = await api.getProducts();
+        setProducts(fetchedProducts);
+      }
     } catch (e) {
       console.error("Failed to update status", e);
+      alert("Error updating status. Please check console.");
+      fetchData(); // Revert on error
+    }
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!itemToDelete || itemToDelete.type !== 'order') return;
+    const order = itemToDelete.data as Order;
+    setIsDeleting(true);
+    try {
+        await api.deleteOrder(order.id);
+        setOrders(prev => prev.filter(o => o.id !== order.id));
+        setIsDeleteModalOpen(false);
+        setItemToDelete(null);
+        if (selectedOrder?.id === order.id) {
+            setSelectedOrder(null);
+        }
+    } catch (e) {
+        console.error("Failed to delete order", e);
+        alert("Failed to delete order.");
+    } finally {
+        setIsDeleting(false);
     }
   };
 
@@ -109,19 +155,33 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
     setIsProductModalOpen(true);
   };
 
-  const openDeleteModal = (product: Product) => {
-    setProductToDelete(product);
+  const openDeleteProductModal = (product: Product) => {
+    setItemToDelete({ type: 'product', data: product });
+    setIsDeleteModalOpen(true);
+  };
+
+  const openDeleteOrderModal = (order: Order, e?: React.MouseEvent) => {
+    if(e) e.stopPropagation();
+    setItemToDelete({ type: 'order', data: order });
     setIsDeleteModalOpen(true);
   };
 
   const confirmDelete = async () => {
-    if (!productToDelete) return;
+    if (!itemToDelete) return;
+
+    if (itemToDelete.type === 'order') {
+        await handleDeleteOrder();
+        return;
+    }
+
+    // Delete Product
+    const product = itemToDelete.data as Product;
     setIsDeleting(true);
     try {
-      await api.deleteProduct(productToDelete.id);
-      setProducts(prev => prev.filter(p => p.id !== productToDelete.id));
+      await api.deleteProduct(product.id);
+      setProducts(prev => prev.filter(p => p.id !== product.id));
       setIsDeleteModalOpen(false);
-      setProductToDelete(null);
+      setItemToDelete(null);
     } catch (error) {
       console.error("Delete failed:", error);
       alert("Failed to delete product.");
@@ -269,46 +329,49 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                                 <th className="p-4">Total</th>
                                 <th className="p-4">Date</th>
                                 <th className="p-4">Status</th>
-                                <th className="p-4">Receipt</th>
+                                <th className="p-4">Actions</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
                               {orders.map(order => (
-                                <tr key={order.id} className="hover:bg-white/5 transition-colors">
+                                <tr 
+                                  key={order.id} 
+                                  onClick={() => setSelectedOrder(order)}
+                                  className="hover:bg-white/5 transition-colors cursor-pointer group"
+                                >
                                   <td className="p-4 font-mono text-white/60 truncate max-w-[100px]" title={order.id}>
-                                    {order.id.split('-')[0]}...
+                                    {order.id.includes('-') ? `${order.id.split('-')[0]}...` : `#${order.id}`}
                                   </td>
                                   <td className="p-4 font-medium">{order.customerDetails.fullName}</td>
                                   <td className="p-4">₱{order.total.toLocaleString()}</td>
                                   <td className="p-4 text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</td>
-                                  <td className="p-4">
+                                  <td className="p-4" onClick={(e) => e.stopPropagation()}>
                                     <select 
                                       value={order.status}
-                                      onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                                      onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
                                       className={`bg-transparent border border-white/20 rounded px-2 py-1 text-xs uppercase font-bold outline-none cursor-pointer
-                                        ${order.status === 'paid' ? 'text-green-400 border-green-400/30' : ''}
-                                        ${order.status === 'shipped' ? 'text-blue-400 border-blue-400/30' : ''}
+                                        ${order.status === 'completed' ? 'text-green-400 border-green-400/30' : ''}
+                                        ${order.status === 'paid' ? 'text-blue-400 border-blue-400/30' : ''}
+                                        ${order.status === 'rejected' ? 'text-red-500 border-red-500/30' : ''}
+                                        ${order.status === 'flagged' ? 'text-orange-500 border-orange-500/30' : ''}
                                         ${order.status === 'pending' ? 'text-yellow-400 border-yellow-400/30' : ''}
                                       `}
                                     >
                                       <option value="pending" className="bg-black text-white">Pending</option>
                                       <option value="paid" className="bg-black text-white">Paid</option>
-                                      <option value="shipped" className="bg-black text-white">Shipped</option>
+                                      <option value="completed" className="bg-black text-white">Completed</option>
+                                      <option value="rejected" className="bg-black text-white">Rejected</option>
+                                      <option value="flagged" className="bg-black text-white">Flagged</option>
                                     </select>
                                   </td>
-                                  <td className="p-4">
-                                    {order.receiptUrl ? (
-                                      <a 
-                                        href={order.receiptUrl} 
-                                        target="_blank" 
-                                        rel="noreferrer"
-                                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors text-xs uppercase font-bold"
-                                      >
-                                        View <ExternalLink className="w-3 h-3" />
-                                      </a>
-                                    ) : (
-                                      <span className="text-gray-600 text-xs italic">No Upload</span>
-                                    )}
+                                  <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                                     <button 
+                                        onClick={(e) => openDeleteOrderModal(order, e)}
+                                        className="p-2 text-gray-500 hover:text-red-500 transition-colors"
+                                        title="Delete Order"
+                                     >
+                                        <Trash2 className="w-4 h-4" />
+                                     </button>
                                   </td>
                                 </tr>
                               ))}
@@ -404,7 +467,7 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                                                             <Edit className="w-4 h-4" />
                                                         </button>
                                                         <button 
-                                                            onClick={() => openDeleteModal(product)}
+                                                            onClick={() => openDeleteProductModal(product)}
                                                             className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
                                                             title="Delete"
                                                         >
@@ -421,6 +484,164 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                     </div>
                 )}
             </>
+        )}
+
+        {/* --- ORDER DETAILS MODAL --- */}
+        {selectedOrder && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setSelectedOrder(null)} />
+                
+                <div className="relative bg-brand-dark border border-white/10 w-full max-w-4xl p-6 md:p-8 shadow-2xl animate-fade-in-up flex flex-col max-h-[90vh]">
+                    <div className="flex justify-between items-start mb-6 pb-6 border-b border-white/10">
+                        <div>
+                            <h2 className="text-2xl font-bold tracking-wide text-white flex items-center gap-3">
+                                ORDER #{selectedOrder.id}
+                                <span className={`text-xs px-2 py-1 rounded-full uppercase tracking-widest border ${
+                                    selectedOrder.status === 'completed' ? 'border-green-500 text-green-500' :
+                                    selectedOrder.status === 'paid' ? 'border-blue-500 text-blue-500' :
+                                    selectedOrder.status === 'rejected' ? 'border-red-500 text-red-500' :
+                                    selectedOrder.status === 'flagged' ? 'border-orange-500 text-orange-500' :
+                                    'border-yellow-500 text-yellow-500'
+                                }`}>
+                                    {selectedOrder.status}
+                                </span>
+                            </h2>
+                            <p className="text-gray-500 text-sm mt-1">{new Date(selectedOrder.createdAt).toLocaleString()}</p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                             <button 
+                                onClick={() => openDeleteOrderModal(selectedOrder)}
+                                className="text-red-500 hover:text-red-400 flex items-center gap-1 text-xs uppercase font-bold tracking-wider border border-red-500/30 px-3 py-2 rounded hover:bg-red-500/10 transition-colors"
+                            >
+                                <Trash2 className="w-4 h-4" /> Delete Order
+                            </button>
+                            <div className="h-8 w-px bg-white/10"></div>
+                            <button onClick={() => setSelectedOrder(null)} className="text-gray-500 hover:text-white transition-colors">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 overflow-y-auto">
+                        {/* LEFT COLUMN: Details */}
+                        <div className="space-y-8">
+                            {/* Customer Info */}
+                            <div>
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+                                    <User className="w-4 h-4" /> Customer Information
+                                </h3>
+                                <div className="space-y-3 bg-white/5 p-4 rounded-lg border border-white/5">
+                                    <div>
+                                        <p className="text-gray-400 text-xs uppercase">Full Name</p>
+                                        <p className="font-medium text-white">{selectedOrder.customerDetails.fullName}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-gray-400 text-xs uppercase flex items-center gap-1"><Phone className="w-3 h-3"/> Contact</p>
+                                            <p className="font-medium text-white">{selectedOrder.customerDetails.contactNumber}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-400 text-xs uppercase flex items-center gap-1"><Mail className="w-3 h-3"/> Email</p>
+                                            <p className="font-medium text-white truncate" title={selectedOrder.customerDetails.email}>{selectedOrder.customerDetails.email}</p>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-400 text-xs uppercase flex items-center gap-1"><MapPin className="w-3 h-3"/> Shipping Address</p>
+                                        <p className="font-medium text-white leading-relaxed">{selectedOrder.customerDetails.address}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Order Items */}
+                            <div>
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+                                    <Package className="w-4 h-4" /> Order Summary
+                                </h3>
+                                <div className="bg-white/5 rounded-lg border border-white/5 overflow-hidden">
+                                    {selectedOrder.items.map((item, idx) => (
+                                        <div key={idx} className="flex gap-4 p-4 border-b border-white/5 last:border-0">
+                                            <div className="w-12 h-12 bg-gray-900 rounded-sm overflow-hidden flex-shrink-0">
+                                                 {item.image_url && <img src={item.image_url} alt="" className="w-full h-full object-cover" />}
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="font-bold text-sm text-white">{item.name}</p>
+                                                <p className="text-xs text-gray-400">Qty: {item.quantity} x ₱{item.price.toLocaleString()}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-medium text-white">₱{(item.price * item.quantity).toLocaleString()}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div className="p-4 bg-white/10 flex justify-between items-center">
+                                        <span className="font-bold text-sm uppercase tracking-wider">Total Amount</span>
+                                        <span className="font-bold text-xl text-white">₱{selectedOrder.total.toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* RIGHT COLUMN: Receipt */}
+                        <div className="flex flex-col h-full">
+                            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+                                <CreditCard className="w-4 h-4" /> Payment Verification
+                            </h3>
+                            
+                            <div className="flex-1 bg-black border border-white/10 rounded-lg p-2 flex flex-col">
+                                <div className="flex items-center justify-between mb-2 px-2">
+                                    <span className="text-xs text-gray-400 uppercase">{selectedOrder.customerDetails.paymentMethod}</span>
+                                    {selectedOrder.receiptUrl && (
+                                        <a href={selectedOrder.receiptUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:text-white flex items-center gap-1">
+                                            Open Original <ExternalLink className="w-3 h-3"/>
+                                        </a>
+                                    )}
+                                </div>
+                                
+                                <div className="flex-1 bg-gray-900/50 rounded flex items-center justify-center relative overflow-hidden min-h-[300px]">
+                                    {selectedOrder.receiptUrl ? (
+                                        <img 
+                                            src={selectedOrder.receiptUrl} 
+                                            alt="Payment Receipt" 
+                                            className="w-full h-full object-contain"
+                                        />
+                                    ) : (
+                                        <div className="text-center text-gray-500">
+                                            <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                            <p className="text-sm">No receipt uploaded yet</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="mt-6 pt-6 border-t border-white/10 flex flex-col gap-4">
+                                {selectedOrder.status !== 'completed' && (
+                                    <button 
+                                        onClick={() => handleStatusChange(selectedOrder.id, 'completed')}
+                                        className="w-full bg-white text-black py-3 font-bold uppercase tracking-widest hover:bg-green-500 hover:text-white transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <CheckCircle className="w-4 h-4" /> Mark Completed
+                                    </button>
+                                )}
+                                
+                                <div className="flex gap-4">
+                                    <button 
+                                        onClick={() => handleStatusChange(selectedOrder.id, 'rejected')}
+                                        className="flex-1 border border-red-500/50 text-red-500 py-3 font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center gap-2 text-xs"
+                                    >
+                                        <Ban className="w-3 h-3" /> Reject
+                                    </button>
+                                    <button 
+                                        onClick={() => handleStatusChange(selectedOrder.id, 'flagged')}
+                                        className="flex-1 border border-orange-500/50 text-orange-500 py-3 font-bold uppercase tracking-widest hover:bg-orange-500 hover:text-white transition-colors flex items-center justify-center gap-2 text-xs"
+                                    >
+                                        <Flag className="w-3 h-3" /> Flag
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         )}
 
         {/* --- PRODUCT MODAL --- */}
@@ -487,9 +708,10 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                                             type="number"
                                             required
                                             min="0"
-                                            value={productForm.price}
+                                            value={productForm.price === 0 ? '' : productForm.price}
                                             onChange={e => setProductForm({...productForm, price: Number(e.target.value)})}
                                             className="w-full bg-black border border-white/20 p-3 text-white focus:border-white outline-none transition-colors"
+                                            placeholder="0"
                                         />
                                     </div>
                                     <div>
@@ -498,9 +720,10 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                                             type="number"
                                             required
                                             min="0"
-                                            value={productForm.stock_quantity}
+                                            value={productForm.stock_quantity === 0 ? '' : productForm.stock_quantity}
                                             onChange={e => setProductForm({...productForm, stock_quantity: Number(e.target.value)})}
                                             className="w-full bg-black border border-white/20 p-3 text-white focus:border-white outline-none transition-colors"
+                                            placeholder="0"
                                         />
                                     </div>
                                 </div>
@@ -534,7 +757,7 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
         )}
 
         {/* --- DELETE CONFIRMATION MODAL --- */}
-        {isDeleteModalOpen && productToDelete && (
+        {isDeleteModalOpen && itemToDelete && (
             <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
                 <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => !isDeleting && setIsDeleteModalOpen(false)} />
                 
@@ -543,9 +766,9 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                         <AlertTriangle className="w-8 h-8 text-red-500" />
                     </div>
                     
-                    <h2 className="text-2xl font-bold mb-2 tracking-wide text-white">DELETE PRODUCT?</h2>
+                    <h2 className="text-2xl font-bold mb-2 tracking-wide text-white">DELETE {itemToDelete.type === 'order' ? 'ORDER' : 'PRODUCT'}?</h2>
                     <p className="text-gray-400 mb-6 text-sm">
-                        Are you sure you want to delete <span className="font-bold text-white">{productToDelete.name}</span>? 
+                        Are you sure you want to delete {itemToDelete.type === 'order' ? `Order #${(itemToDelete.data as Order).id}` : <span className="font-bold text-white">{(itemToDelete.data as Product).name}</span>}? 
                         <br/>This action cannot be undone.
                     </p>
 

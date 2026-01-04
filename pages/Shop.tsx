@@ -47,9 +47,15 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
   const addToCart = (product: Product) => {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
+      
+      // Validation: Check if we have enough stock for a new item or increment
+      const currentQtyInCart = existing ? existing.quantity : 0;
+      if (currentQtyInCart + 1 > product.stock_quantity) {
+        alert(`Sorry, you can't add more. Only ${product.stock_quantity} left in stock.`);
+        return prev;
+      }
+
       if (existing) {
-        // Check stock limit logic could go here
-        if (existing.quantity >= product.stock_quantity) return prev;
         return prev.map(item => 
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
@@ -66,10 +72,19 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
   const updateQuantity = (id: string, delta: number) => {
     setCart(prev => prev.map(item => {
       if (item.id === id) {
-        const newQty = Math.max(1, item.quantity + delta);
-        // Basic stock check
+        const newQty = item.quantity + delta;
+        
+        // Prevent going below 1
+        if (newQty < 1) return item;
+
+        // Prevent exceeding stock
+        // Find the product source of truth to get max stock
         const product = products.find(p => p.id === id);
-        if (product && newQty > product.stock_quantity) return item;
+        if (product && newQty > product.stock_quantity) {
+             alert(`Cannot exceed available stock of ${product.stock_quantity}`);
+             return item;
+        }
+
         return { ...item, quantity: newQty };
       }
       return item;

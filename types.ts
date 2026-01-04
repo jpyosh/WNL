@@ -19,12 +19,14 @@ export interface OrderForm {
   paymentMethod: 'GCash' | 'Bank Transfer';
 }
 
+export type OrderStatus = 'pending' | 'paid' | 'completed' | 'rejected' | 'flagged';
+
 export interface Order {
   id: string;
   items: CartItem[];
   total: number;
   customerDetails: OrderForm;
-  status: 'pending' | 'paid' | 'shipped';
+  status: OrderStatus;
   receiptUrl?: string;
   createdAt: string;
 }
