@@ -52,12 +52,18 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
   const [itemToDelete, setItemToDelete] = useState<{ type: 'product' | 'order', data: Product | Order } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  // Product Form State
-  const [productForm, setProductForm] = useState({
+  // Product Form State - allowing string | number for inputs to handle empty state better
+  const [productForm, setProductForm] = useState<{
+    name: string;
+    description: string;
+    price: number | string;
+    stock_quantity: number | string;
+    category: string;
+  }>({
     name: '',
     description: '',
-    price: 0,
-    stock_quantity: 0,
+    price: '',
+    stock_quantity: '',
     category: 'Prospex', // Default value
   });
   const [productImageFile, setProductImageFile] = useState<File | null>(null);
@@ -140,9 +146,9 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
     setProductForm({ 
       name: '', 
       description: '', 
-      price: 0, 
-      stock_quantity: 0,
-      category: 'Prospex' // Reset to default
+      price: '', // Start empty to avoid "0" placeholder
+      stock_quantity: '', // Start empty to avoid "0" placeholder
+      category: 'Prospex' // Default
     });
     setProductImageFile(null);
     setProductImagePreview(null);
@@ -217,9 +223,13 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
         imageUrl = await api.uploadProductImage(productImageFile);
       }
 
-      // 2. Upsert Product
+      // Prepare payload, converting strings to numbers and defaulting empty to 0
       const payload = {
-        ...productForm,
+        name: productForm.name,
+        description: productForm.description,
+        category: productForm.category,
+        price: productForm.price === '' ? 0 : Number(productForm.price),
+        stock_quantity: productForm.stock_quantity === '' ? 0 : Number(productForm.stock_quantity),
         image_url: imageUrl
       };
 
@@ -462,7 +472,7 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                                                 </td>
                                                 <td className="p-4">
                                                     <span className="bg-white/10 px-2 py-1 rounded text-xs uppercase tracking-wide text-gray-300">
-                                                        {product.category || 'N/A'}
+                                                        {product.category || 'Others'}
                                                     </span>
                                                 </td>
                                                 <td className="p-4">₱{product.price.toLocaleString()}</td>
@@ -498,164 +508,6 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                     </div>
                 )}
             </>
-        )}
-
-        {/* --- ORDER DETAILS MODAL --- */}
-        {selectedOrder && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setSelectedOrder(null)} />
-                
-                <div className="relative bg-brand-dark border border-white/10 w-full max-w-4xl p-6 md:p-8 shadow-2xl animate-fade-in-up flex flex-col max-h-[90vh]">
-                    <div className="flex justify-between items-start mb-6 pb-6 border-b border-white/10">
-                        <div>
-                            <h2 className="text-2xl font-bold tracking-wide text-white flex items-center gap-3">
-                                ORDER #{selectedOrder.id}
-                                <span className={`text-xs px-2 py-1 rounded-full uppercase tracking-widest border ${
-                                    selectedOrder.status === 'completed' ? 'border-green-500 text-green-500' :
-                                    selectedOrder.status === 'paid' ? 'border-blue-500 text-blue-500' :
-                                    selectedOrder.status === 'rejected' ? 'border-red-500 text-red-500' :
-                                    selectedOrder.status === 'flagged' ? 'border-orange-500 text-orange-500' :
-                                    'border-yellow-500 text-yellow-500'
-                                }`}>
-                                    {selectedOrder.status}
-                                </span>
-                            </h2>
-                            <p className="text-gray-500 text-sm mt-1">{new Date(selectedOrder.createdAt).toLocaleString()}</p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                             <button 
-                                onClick={() => openDeleteOrderModal(selectedOrder)}
-                                className="text-red-500 hover:text-red-400 flex items-center gap-1 text-xs uppercase font-bold tracking-wider border border-red-500/30 px-3 py-2 rounded hover:bg-red-500/10 transition-colors"
-                            >
-                                <Trash2 className="w-4 h-4" /> Delete Order
-                            </button>
-                            <div className="h-8 w-px bg-white/10"></div>
-                            <button onClick={() => setSelectedOrder(null)} className="text-gray-500 hover:text-white transition-colors">
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 overflow-y-auto">
-                        {/* LEFT COLUMN: Details */}
-                        <div className="space-y-8">
-                            {/* Customer Info */}
-                            <div>
-                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
-                                    <User className="w-4 h-4" /> Customer Information
-                                </h3>
-                                <div className="space-y-3 bg-white/5 p-4 rounded-lg border border-white/5">
-                                    <div>
-                                        <p className="text-gray-400 text-xs uppercase">Full Name</p>
-                                        <p className="font-medium text-white">{selectedOrder.customerDetails.fullName}</p>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <p className="text-gray-400 text-xs uppercase flex items-center gap-1"><Phone className="w-3 h-3"/> Contact</p>
-                                            <p className="font-medium text-white">{selectedOrder.customerDetails.contactNumber}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-gray-400 text-xs uppercase flex items-center gap-1"><Mail className="w-3 h-3"/> Email</p>
-                                            <p className="font-medium text-white truncate" title={selectedOrder.customerDetails.email}>{selectedOrder.customerDetails.email}</p>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-400 text-xs uppercase flex items-center gap-1"><MapPin className="w-3 h-3"/> Shipping Address</p>
-                                        <p className="font-medium text-white leading-relaxed">{selectedOrder.customerDetails.address}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Order Items */}
-                            <div>
-                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
-                                    <Package className="w-4 h-4" /> Order Summary
-                                </h3>
-                                <div className="bg-white/5 rounded-lg border border-white/5 overflow-hidden">
-                                    {selectedOrder.items.map((item, idx) => (
-                                        <div key={idx} className="flex gap-4 p-4 border-b border-white/5 last:border-0">
-                                            <div className="w-12 h-12 bg-gray-900 rounded-sm overflow-hidden flex-shrink-0">
-                                                 {item.image_url && <img src={item.image_url} alt="" className="w-full h-full object-cover" />}
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className="font-bold text-sm text-white">{item.name}</p>
-                                                <p className="text-xs text-gray-400">Qty: {item.quantity} x ₱{item.price.toLocaleString()}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="font-medium text-white">₱{(item.price * item.quantity).toLocaleString()}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    <div className="p-4 bg-white/10 flex justify-between items-center">
-                                        <span className="font-bold text-sm uppercase tracking-wider">Total Amount</span>
-                                        <span className="font-bold text-xl text-white">₱{selectedOrder.total.toLocaleString()}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* RIGHT COLUMN: Receipt */}
-                        <div className="flex flex-col h-full">
-                            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
-                                <CreditCard className="w-4 h-4" /> Payment Verification
-                            </h3>
-                            
-                            <div className="flex-1 bg-black border border-white/10 rounded-lg p-2 flex flex-col">
-                                <div className="flex items-center justify-between mb-2 px-2">
-                                    <span className="text-xs text-gray-400 uppercase">{selectedOrder.customerDetails.paymentMethod}</span>
-                                    {selectedOrder.receiptUrl && (
-                                        <a href={selectedOrder.receiptUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:text-white flex items-center gap-1">
-                                            Open Original <ExternalLink className="w-3 h-3"/>
-                                        </a>
-                                    )}
-                                </div>
-                                
-                                <div className="flex-1 bg-gray-900/50 rounded flex items-center justify-center relative overflow-hidden min-h-[300px]">
-                                    {selectedOrder.receiptUrl ? (
-                                        <img 
-                                            src={selectedOrder.receiptUrl} 
-                                            alt="Payment Receipt" 
-                                            className="w-full h-full object-contain"
-                                        />
-                                    ) : (
-                                        <div className="text-center text-gray-500">
-                                            <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                            <p className="text-sm">No receipt uploaded yet</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="mt-6 pt-6 border-t border-white/10 flex flex-col gap-4">
-                                {selectedOrder.status !== 'completed' && (
-                                    <button 
-                                        onClick={() => handleStatusChange(selectedOrder.id, 'completed')}
-                                        className="w-full bg-white text-black py-3 font-bold uppercase tracking-widest hover:bg-green-500 hover:text-white transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <CheckCircle className="w-4 h-4" /> Mark Completed
-                                    </button>
-                                )}
-                                
-                                <div className="flex gap-4">
-                                    <button 
-                                        onClick={() => handleStatusChange(selectedOrder.id, 'rejected')}
-                                        className="flex-1 border border-red-500/50 text-red-500 py-3 font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center gap-2 text-xs"
-                                    >
-                                        <Ban className="w-3 h-3" /> Reject
-                                    </button>
-                                    <button 
-                                        onClick={() => handleStatusChange(selectedOrder.id, 'flagged')}
-                                        className="flex-1 border border-orange-500/50 text-orange-500 py-3 font-bold uppercase tracking-widest hover:bg-orange-500 hover:text-white transition-colors flex items-center justify-center gap-2 text-xs"
-                                    >
-                                        <Flag className="w-3 h-3" /> Flag
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         )}
 
         {/* --- PRODUCT MODAL --- */}
@@ -722,11 +574,11 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                                         onChange={e => setProductForm({...productForm, category: e.target.value})}
                                         className="w-full bg-black border border-white/20 p-3 text-white focus:border-white outline-none transition-colors"
                                     >
-                                        <option value="Prospex">Prospex</option>
-                                        <option value="Presage">Presage</option>
-                                        <option value="GMT">GMT</option>
+                                        <option value="Prospex">Prospex (Seiko Sports)</option>
+                                        <option value="Presage">Presage (Seiko Dress)</option>
+                                        <option value="GMT">GMT (Travel Watches)</option>
                                         <option value="Womens">Womens</option>
-                                        <option value="Swiss">Swiss</option>
+                                        <option value="Swiss & Luxury">Swiss & Luxury</option>
                                         <option value="Others">Others</option>
                                     </select>
                                 </div>
@@ -736,10 +588,9 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                                         <label className="block text-xs uppercase tracking-wider text-gray-500 mb-1">Price (₱)</label>
                                         <input 
                                             type="number"
-                                            required
                                             min="0"
-                                            value={productForm.price === 0 ? '' : productForm.price}
-                                            onChange={e => setProductForm({...productForm, price: Number(e.target.value)})}
+                                            value={productForm.price}
+                                            onChange={e => setProductForm({...productForm, price: e.target.value})}
                                             className="w-full bg-black border border-white/20 p-3 text-white focus:border-white outline-none transition-colors"
                                             placeholder="0"
                                         />
@@ -748,10 +599,9 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                                         <label className="block text-xs uppercase tracking-wider text-gray-500 mb-1">Stock Qty</label>
                                         <input 
                                             type="number"
-                                            required
                                             min="0"
-                                            value={productForm.stock_quantity === 0 ? '' : productForm.stock_quantity}
-                                            onChange={e => setProductForm({...productForm, stock_quantity: Number(e.target.value)})}
+                                            value={productForm.stock_quantity}
+                                            onChange={e => setProductForm({...productForm, stock_quantity: e.target.value})}
                                             className="w-full bg-black border border-white/20 p-3 text-white focus:border-white outline-none transition-colors"
                                             placeholder="0"
                                         />

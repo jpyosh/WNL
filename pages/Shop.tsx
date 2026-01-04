@@ -20,7 +20,8 @@ const CATEGORIES = [
   { label: 'Presage', value: 'Presage' },
   { label: 'GMT', value: 'GMT' },
   { label: 'Womens', value: 'Womens' },
-  { label: 'Swiss & Rare', value: 'Swiss' }
+  { label: 'Swiss & Luxury', value: 'Swiss & Luxury' },
+  { label: 'Others', value: 'Others' }
 ];
 
 const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
@@ -62,7 +63,6 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
 
   const getCollectionTitle = () => {
     if (selectedCategory === 'All') return 'LIVE INVENTORY';
-    if (selectedCategory === 'Swiss') return 'SWISS & RARE COLLECTION';
     return `${selectedCategory.toUpperCase()} COLLECTION`;
   };
 
@@ -215,8 +215,8 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
 
         <footer className="border-t border-white/10 py-12 text-center text-gray-600 text-sm">
           <p>&copy; 2024 Watch and Learn. All rights reserved.</p>
-          <p>09613958412 / 09173005367</p>
-          <p>watchandlearn2025@gmail.com</p>
+                    <p>09613958412 / 09173005367</p>
+                    <p>watchandlearn2025@gmail.com</p>
         </footer>
       </main>
 
