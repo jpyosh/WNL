@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
+import { supabase } from '../lib/supabaseClient'; // Import supabase client
 import { Order, Product, OrderStatus } from '../types';
 import { OrderDetailModal } from '../components/OrderDetailModal';
 import { 
@@ -25,20 +26,25 @@ import {
   Ban,
   Flag
 } from 'lucide-react';
+import { Session } from '@supabase/supabase-js';
 
 interface AdminProps {
   onBack: () => void;
 }
 
 const Admin: React.FC<AdminProps> = ({ onBack }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Auth State
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [activeTab, setActiveTab] = useState<'orders' | 'inventory'>('orders');
+  const [loginError, setLoginError] = useState('');
   
-  // Data State
+  // Dashboard State
+  const [activeTab, setActiveTab] = useState<'orders' | 'inventory'>('orders');
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
 
   // Order Detail Modal State
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -48,12 +54,12 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
   const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  // Delete Confirmation State (Polymorphic: can be 'product' or 'order')
+  // Delete Confirmation State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ type: 'product' | 'order', data: Product | Order } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  // Product Form State - allowing string | number for inputs to handle empty state better
+  // Product Form State
   const [productForm, setProductForm] = useState<{
     name: string;
     description: string;
@@ -63,26 +69,63 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
   }>({
     name: '',
     description: '',
-    price: '',
-    stock_quantity: '',
-    category: 'Prospex', // Default value
+    price: '', 
+    stock_quantity: '', 
+    category: 'Prospex', 
   });
   const [productImageFile, setProductImageFile] = useState<File | null>(null);
   const [productImagePreview, setProductImagePreview] = useState<string | null>(null);
 
-  // Simple Auth Check
-  const handleLogin = (e: React.FormEvent) => {
+  // --- Authentication Logic ---
+
+  useEffect(() => {
+    // Check active session on load
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+      if (session) fetchData();
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) fetchData();
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === 'admin123') {
-      setIsAuthenticated(true);
-      fetchData();
+    setAuthLoading(true);
+    setLoginError('');
+    
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setLoginError(error.message);
+      setAuthLoading(false);
     } else {
-      alert('Invalid Password');
+        // Successful login will trigger onAuthStateChange
+        // We don't need to do anything here manually
     }
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    onBack(); // Go back to shop after logout
+  };
+
+  // --- Data Logic ---
+
   const fetchData = async () => {
-    setLoading(true);
+    setDataLoading(true);
     try {
       const [fetchedOrders, fetchedProducts] = await Promise.all([
         api.getOrders(),
@@ -93,22 +136,19 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(false);
+      setDataLoading(false);
     }
   };
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
-    // Optimistic UI update
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     
-    // Also update the selected order if it's open
     if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder(prev => prev ? ({ ...prev, status: newStatus }) : null);
     }
 
     try {
       await api.updateOrderStatus(orderId, newStatus);
-      // If completed, we should refresh inventory data to see new stock levels
       if (newStatus === 'completed') {
         const fetchedProducts = await api.getProducts();
         setProducts(fetchedProducts);
@@ -116,7 +156,7 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
     } catch (e) {
       console.error("Failed to update status", e);
       alert("Error updating status. Please check console.");
-      fetchData(); // Revert on error
+      fetchData(); 
     }
   };
 
@@ -147,9 +187,9 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
     setProductForm({ 
       name: '', 
       description: '', 
-      price: '', // Start empty to avoid "0" placeholder
-      stock_quantity: '', // Start empty to avoid "0" placeholder
-      category: 'Prospex' // Default
+      price: '', 
+      stock_quantity: '', 
+      category: 'Prospex' 
     });
     setProductImageFile(null);
     setProductImagePreview(null);
@@ -219,12 +259,10 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
     try {
       let imageUrl = editingProduct?.image_url || '';
 
-      // 1. Upload Image if new file selected
       if (productImageFile) {
         imageUrl = await api.uploadProductImage(productImageFile);
       }
 
-      // Prepare payload, converting strings to numbers and defaulting empty to 0
       const payload = {
         name: productForm.name,
         description: productForm.description,
@@ -241,7 +279,6 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
         await api.createProduct(payload);
       }
 
-      // 3. Refresh & Close
       await fetchData();
       setIsProductModalOpen(false);
     } catch (error) {
@@ -252,9 +289,8 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
     }
   };
 
-  // --- Render ---
-
-  if (!isAuthenticated) {
+  // --- Render Login Screen ---
+  if (!session) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
         <button 
@@ -264,25 +300,44 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
           <ArrowLeft className="w-4 h-4" /> Back to Shop
         </button>
 
-        <div className="bg-brand-dark border border-white/10 p-8 w-full max-w-md text-center relative">
+        <div className="bg-brand-dark border border-white/10 p-8 w-full max-w-md text-center relative animate-fade-in-up">
           <div className="bg-white/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
             <Lock className="text-white w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-6 tracking-wide">ADMIN ACCESS</h1>
-          <form onSubmit={handleLogin}>
+          <h1 className="text-2xl font-bold text-white mb-2 tracking-wide">ADMIN ACCESS</h1>
+          <p className="text-gray-500 text-xs mb-6 uppercase tracking-widest">Secure Login</p>
+          
+          <form onSubmit={handleLogin} className="space-y-4">
+            {loginError && (
+              <div className="bg-red-500/10 border border-red-500/20 p-3 text-red-500 text-xs text-center">
+                {loginError}
+              </div>
+            )}
+            
+            <input 
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-black border border-white/20 p-3 text-white focus:border-white outline-none text-center tracking-wider"
+              placeholder="EMAIL ADDRESS"
+              required
+            />
+            
             <input 
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-black border border-white/20 p-3 text-white focus:border-white outline-none mb-4 text-center tracking-widest"
-              placeholder="ENTER PASSWORD"
-              autoFocus
+              className="w-full bg-black border border-white/20 p-3 text-white focus:border-white outline-none text-center tracking-wider"
+              placeholder="PASSWORD"
+              required
             />
+            
             <button 
               type="submit"
-              className="w-full bg-white text-black py-3 font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors"
+              disabled={authLoading}
+              className="w-full bg-white text-black py-3 font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors flex justify-center items-center gap-2 disabled:opacity-50"
             >
-              Login
+              {authLoading ? <Loader2 className="animate-spin w-4 h-4" /> : 'Login'}
             </button>
           </form>
         </div>
@@ -290,6 +345,7 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
     );
   }
 
+  // --- Render Dashboard ---
   const lowStockProducts = products.filter(p => p.stock_quantity < 3);
 
   return (
@@ -320,11 +376,16 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                 </button>
             </div>
             <div className="h-8 w-px bg-white/10 mx-2"></div>
-            <button onClick={onBack} className="text-xs text-gray-500 hover:text-white uppercase tracking-wider">Log Out</button>
+            <button 
+              onClick={handleLogout} 
+              className="text-xs text-gray-500 hover:text-white uppercase tracking-wider"
+            >
+              Log Out
+            </button>
           </div>
         </div>
 
-        {loading ? (
+        {dataLoading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="animate-spin w-8 h-8 text-white/50" />
           </div>

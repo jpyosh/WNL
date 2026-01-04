@@ -56,7 +56,10 @@ class WatchAndLearnService {
 
         if (oldProduct?.image_url) {
             const oldPath = this._getStoragePathFromUrl(oldProduct.image_url);
-            if (oldPath) await supabase.storage.from('products').remove([oldPath]);
+            if (oldPath) {
+                const { error: storageError } = await supabase.storage.from('products').remove([oldPath]);
+                if (storageError) console.error("Warning: Failed to delete old product image:", storageError);
+            }
         }
     }
 
@@ -79,9 +82,9 @@ class WatchAndLearnService {
     // 2. Delete image from bucket
     if (product?.image_url) {
         const path = this._getStoragePathFromUrl(product.image_url);
-        // Only attempt to delete if it looks like a file we host (basic check)
         if (path) {
-            await supabase.storage.from('products').remove([path]);
+            const { error: storageError } = await supabase.storage.from('products').remove([path]);
+            if (storageError) console.error("Warning: Failed to delete product image from storage:", storageError);
         }
     }
 
@@ -209,7 +212,8 @@ class WatchAndLearnService {
     if (order?.payment_receipt_url) {
         const path = this._getStoragePathFromUrl(order.payment_receipt_url);
         if (path) {
-            await supabase.storage.from('receipts').remove([path]);
+            const { error: storageError } = await supabase.storage.from('receipts').remove([path]);
+            if (storageError) console.error("Warning: Failed to delete receipt from storage:", storageError);
         }
     }
 
@@ -301,13 +305,14 @@ class WatchAndLearnService {
 
   private _getStoragePathFromUrl(url: string): string | null {
     try {
-        // Assume format ends with the filename for simple uploads
-        // If the URL is from Supabase, getting the last segment usually works for flat buckets
         if (url.includes('supabase.co')) {
-            return url.split('/').pop() || null;
+            const fileName = url.split('/').pop();
+            // Important: Decode the URL to handle spaces or special chars correctly
+            return fileName ? decodeURIComponent(fileName) : null;
         }
         return null; 
     } catch (e) {
+        console.error("Error extracting storage path:", e);
         return null;
     }
   }
