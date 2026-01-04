@@ -58,6 +58,7 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
     description: '',
     price: 0,
     stock_quantity: 0,
+    category: 'Prospex', // Default value
   });
   const [productImageFile, setProductImageFile] = useState<File | null>(null);
   const [productImagePreview, setProductImagePreview] = useState<string | null>(null);
@@ -136,7 +137,13 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
 
   const openAddProductModal = () => {
     setEditingProduct(null);
-    setProductForm({ name: '', description: '', price: 0, stock_quantity: 0 });
+    setProductForm({ 
+      name: '', 
+      description: '', 
+      price: 0, 
+      stock_quantity: 0,
+      category: 'Prospex' // Reset to default
+    });
     setProductImageFile(null);
     setProductImagePreview(null);
     setIsProductModalOpen(true);
@@ -149,6 +156,7 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
       description: product.description,
       price: product.price,
       stock_quantity: product.stock_quantity,
+      category: product.category || 'Prospex'
     });
     setProductImageFile(null);
     setProductImagePreview(product.image_url);
@@ -434,6 +442,7 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                                         <tr className="bg-white/5 text-gray-400 border-b border-white/10 uppercase text-xs tracking-wider">
                                             <th className="p-4 w-20">Image</th>
                                             <th className="p-4">Name / ID</th>
+                                            <th className="p-4">Category</th>
                                             <th className="p-4">Price</th>
                                             <th className="p-4">Stock</th>
                                             <th className="p-4 text-right">Actions</th>
@@ -450,6 +459,11 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                                                 <td className="p-4">
                                                     <div className="font-bold text-white">{product.name}</div>
                                                     <div className="text-xs text-gray-500 font-mono truncate max-w-[150px]">{product.id}</div>
+                                                </td>
+                                                <td className="p-4">
+                                                    <span className="bg-white/10 px-2 py-1 rounded text-xs uppercase tracking-wide text-gray-300">
+                                                        {product.category || 'N/A'}
+                                                    </span>
                                                 </td>
                                                 <td className="p-4">₱{product.price.toLocaleString()}</td>
                                                 <td className="p-4">
@@ -699,6 +713,22 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                                         className="w-full bg-black border border-white/20 p-3 text-white focus:border-white outline-none transition-colors"
                                         placeholder="e.g. Chrono Elite"
                                     />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs uppercase tracking-wider text-gray-500 mb-1">Category</label>
+                                    <select 
+                                        value={productForm.category}
+                                        onChange={e => setProductForm({...productForm, category: e.target.value})}
+                                        className="w-full bg-black border border-white/20 p-3 text-white focus:border-white outline-none transition-colors"
+                                    >
+                                        <option value="Prospex">Prospex</option>
+                                        <option value="Presage">Presage</option>
+                                        <option value="GMT">GMT</option>
+                                        <option value="Womens">Womens</option>
+                                        <option value="Swiss">Swiss</option>
+                                        <option value="Others">Others</option>
+                                    </select>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
