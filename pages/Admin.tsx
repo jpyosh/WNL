@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { Order, Product, OrderStatus } from '../types';
+import { OrderDetailModal } from '../components/OrderDetailModal';
 import { 
   Lock, 
   Loader2, 
@@ -509,6 +510,14 @@ const Admin: React.FC<AdminProps> = ({ onBack }) => {
                 )}
             </>
         )}
+
+        {/* --- ORDER DETAIL MODAL --- */}
+        <OrderDetailModal 
+            isOpen={!!selectedOrder} 
+            order={selectedOrder} 
+            onClose={() => setSelectedOrder(null)}
+            onStatusChange={handleStatusChange}
+        />
 
         {/* --- PRODUCT MODAL --- */}
         {isProductModalOpen && (

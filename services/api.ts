@@ -46,6 +46,20 @@ class WatchAndLearnService {
   }
 
   async updateProduct(id: string, updates: Partial<Product>): Promise<void> {
+    // If image_url is being updated, delete the old one
+    if (updates.image_url) {
+        const { data: oldProduct } = await supabase
+            .from('products')
+            .select('image_url')
+            .eq('id', id)
+            .single();
+
+        if (oldProduct?.image_url) {
+            const oldPath = this._getStoragePathFromUrl(oldProduct.image_url);
+            if (oldPath) await supabase.storage.from('products').remove([oldPath]);
+        }
+    }
+
     const { error } = await supabase
       .from('products')
       .update(updates)
@@ -55,6 +69,23 @@ class WatchAndLearnService {
   }
 
   async deleteProduct(id: string): Promise<void> {
+    // 1. Get image url to delete from storage
+    const { data: product } = await supabase
+        .from('products')
+        .select('image_url')
+        .eq('id', id)
+        .single();
+
+    // 2. Delete image from bucket
+    if (product?.image_url) {
+        const path = this._getStoragePathFromUrl(product.image_url);
+        // Only attempt to delete if it looks like a file we host (basic check)
+        if (path) {
+            await supabase.storage.from('products').remove([path]);
+        }
+    }
+
+    // 3. Delete record
     const { error } = await supabase
       .from('products')
       .delete()
@@ -113,19 +144,29 @@ class WatchAndLearnService {
     }));
   }
 
-  async updateOrderStatus(orderId: string, status: OrderStatus): Promise<void> {
-    // 1. Update status
+  async updateOrderStatus(orderId: string, newStatus: OrderStatus): Promise<void> {
+    // 1. Fetch current order to check existing status
+    const { data: currentOrder, error: fetchError } = await supabase
+      .from('orders')
+      .select('status')
+      .eq('id', orderId)
+      .single();
+
+    if (fetchError) throw new Error(`Failed to fetch current order status: ${fetchError.message}`);
+
+    // 2. Inventory Logic: Only deduct if moving TO completed FROM a non-completed state
+    // This prevents double deduction if "Completed" is clicked multiple times
+    if (newStatus === 'completed' && currentOrder.status !== 'completed') {
+      await this._deductInventory(orderId);
+    }
+
+    // 3. Update status
     const { error } = await supabase
       .from('orders')
-      .update({ status })
+      .update({ status: newStatus })
       .eq('id', orderId);
 
     if (error) throw new Error(`Failed to update status: ${error.message}`);
-
-    // 2. Inventory Logic: strictly strictly apply deduction only on completion
-    if (status === 'completed') {
-      await this._deductInventory(orderId);
-    }
   }
 
   private async _deductInventory(orderId: string): Promise<void> {
@@ -157,7 +198,22 @@ class WatchAndLearnService {
   }
 
   async deleteOrder(orderId: string): Promise<void> {
-    // 1. Delete associated order items first (Foreign Key Constraint)
+    // 1. Get receipt url to delete from storage
+    const { data: order } = await supabase
+        .from('orders')
+        .select('payment_receipt_url')
+        .eq('id', orderId)
+        .single();
+
+    // 2. Delete receipt from bucket
+    if (order?.payment_receipt_url) {
+        const path = this._getStoragePathFromUrl(order.payment_receipt_url);
+        if (path) {
+            await supabase.storage.from('receipts').remove([path]);
+        }
+    }
+
+    // 3. Delete associated order items first (Foreign Key Constraint)
     const { error: itemsError } = await supabase
         .from('order_items')
         .delete()
@@ -165,7 +221,7 @@ class WatchAndLearnService {
 
     if (itemsError) throw new Error(`Failed to delete order items: ${itemsError.message}`);
 
-    // 2. Delete the order
+    // 4. Delete the order
     const { error: orderError } = await supabase
         .from('orders')
         .delete()
@@ -241,6 +297,19 @@ class WatchAndLearnService {
     if (updateError) throw new Error(`Failed to link receipt: ${updateError.message}`);
 
     return publicUrl;
+  }
+
+  private _getStoragePathFromUrl(url: string): string | null {
+    try {
+        // Assume format ends with the filename for simple uploads
+        // If the URL is from Supabase, getting the last segment usually works for flat buckets
+        if (url.includes('supabase.co')) {
+            return url.split('/').pop() || null;
+        }
+        return null; 
+    } catch (e) {
+        return null;
+    }
   }
 }
 
