@@ -1,0 +1,31 @@
+export interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  stock_quantity: number;
+  image_url: string;
+  category?: string;
+}
+
+export interface CartItem extends Product {
+  quantity: number;
+}
+
+export interface OrderForm {
+  fullName: string;
+  address: string;
+  contactNumber: string;
+  email: string;
+  paymentMethod: 'GCash' | 'Bank Transfer';
+}
+
+export interface Order {
+  id: string;
+  items: CartItem[];
+  total: number;
+  customerDetails: OrderForm;
+  status: 'pending' | 'paid' | 'shipped';
+  receiptUrl?: string;
+  createdAt: string;
+}
