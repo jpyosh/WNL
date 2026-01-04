@@ -8,6 +8,7 @@ import { ReceiptModal } from '../components/ReceiptModal';
 import { ProductDetailsModal } from '../components/ProductDetailsModal';
 import { Product, CartItem, OrderForm } from '../types';
 import { api } from '../services/api';
+import { sendOrderConfirmation } from '../services/email';
 import { Loader2, Watch } from 'lucide-react';
 
 interface ShopProps {
@@ -120,7 +121,13 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
   const handleCheckoutSubmit = async (formData: OrderForm) => {
     setIsProcessingOrder(true);
     try {
+      // 1. Create Order in Supabase
       const order = await api.createOrder(formData, cart, cartTotal);
+      
+      // 2. Send Confirmation Email (Non-blocking UI)
+      await sendOrderConfirmation(order);
+
+      // 3. Update UI State
       setCurrentOrderId(order.id);
       setIsCheckoutOpen(false);
       setIsReceiptOpen(true);
@@ -215,8 +222,8 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
 
         <footer className="border-t border-white/10 py-12 text-center text-gray-600 text-sm">
           <p>&copy; 2024 Watch and Learn. All rights reserved.</p>
-                    <p>09613958412 / 09173005367</p>
-                    <p>watchandlearn2025@gmail.com</p>
+                              <p>09613958412 / 09173005367</p>
+                              <p>watchandlearn2025@gmail.com</p>
         </footer>
       </main>
 
