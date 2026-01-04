@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { UploadCloud, CheckCircle, Loader2, Copy, Wallet } from 'lucide-react';
 
@@ -12,23 +13,32 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, orderId, onU
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
+      setErrorMessage(''); // Clear error on new file selection
     }
   };
 
   const handleSubmit = async () => {
     if (!file) return;
     setIsUploading(true);
+    setErrorMessage('');
+    
     try {
       await onUpload(file);
       setIsSuccess(true);
     } catch (error) {
       console.error("Upload failed", error);
+      setErrorMessage('Upload failed. Please try again or check your connection.');
+      // If it's a specific Supabase error object, you might want to show error.message
+      if (error instanceof Error) {
+        setErrorMessage(error.message);
+      }
     } finally {
       setIsUploading(false);
     }
@@ -59,6 +69,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, orderId, onU
                         src="/GCASH.jpg" 
                         alt="GCash QR Code" 
                         className="w-full h-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://placehold.co/200x200?text=QR+Code';
+                        }}
                     />
                 </div>
 
@@ -77,7 +90,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, orderId, onU
                     Upload Payment Screenshot
                 </label>
                 
-                <div className="border-2 border-dashed border-white/20 rounded-lg p-6 hover:border-white/50 transition-colors relative text-center">
+                <div className={`border-2 border-dashed rounded-lg p-6 hover:border-white/50 transition-colors relative text-center ${errorMessage ? 'border-red-500 bg-red-500/5' : 'border-white/20'}`}>
                     <input 
                         type="file" 
                         accept="image/*"
@@ -97,6 +110,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, orderId, onU
                         </div>
                     )}
                 </div>
+
+                {errorMessage && (
+                  <p className="text-red-500 text-xs text-center font-bold">{errorMessage}</p>
+                )}
 
                 <button 
                     onClick={handleSubmit}
