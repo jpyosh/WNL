@@ -55,7 +55,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, 
         <p className="text-sm text-gray-500 mb-4 line-clamp-2 flex-grow">{product.description}</p>
         
         <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center text-xs text-gray-500 uppercase tracking-wider">
-            <span>General</span>
+            {/* FIX: Use product.category instead of "General" */}
+            <span className="text-gray-400 font-bold">{product.category || 'General'}</span>
             <span className={isSoldOut ? "text-red-500" : "text-green-500"}>
                 {isSoldOut ? 'Out of Stock' : `${product.stock_quantity} Available`}
             </span>
