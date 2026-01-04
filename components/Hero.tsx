@@ -5,7 +5,11 @@ const BACKGROUNDS = [
   '/561955812_17867936649452578_5355559714932562052_n.jpg', // Dark texture
   '/584246070_122144921852806819_1620487718032085716_n.jpg',
   '604122882_17875920348452578_5198481956637276166_n.jpg',
-  '605985795_122149088420806819_374256387986473946_n.jpg' // Watch Lifestyle
+  '605985795_122149088420806819_374256387986473946_n.jpg',
+  '1.jpg',
+  '2.jpg',
+  '3.jpg',
+  '4.jpg', // Watch Lifestyle
 ];
 
 export const Hero: React.FC = () => {
@@ -40,10 +44,10 @@ export const Hero: React.FC = () => {
       {/* Content */}
       <div className="relative z-10 text-center max-w-4xl px-4 animate-fade-in-up">
         <h1 className="text-5xl md:text-7xl font-bold tracking-tighter mb-6 text-white drop-shadow-2xl">
-          PRECISION & STYLE
+          WATCH AND LEARN
         </h1>
         <p className="text-gray-300 text-lg md:text-xl tracking-wide font-light max-w-2xl mx-auto mb-8">
-          The premium collection for the modern visionary. Experience quality that speaks for itself.
+          Buying, selling, and trading modern timepieces with a focus on quality and fair deals. Ensuring every transaction is built on trust and value
         </p>
         <button 
             onClick={() => {
