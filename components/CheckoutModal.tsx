@@ -16,14 +16,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, o
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={onClose} />
       
+      {/* Modal Container */}
       <div className="relative bg-brand-dark border border-white/10 w-full max-w-lg p-8 shadow-2xl animate-fade-in-up">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
           <X className="w-6 h-6" />
         </button>
 
-        <h2 className="text-2xl font-bold mb-6 tracking-wide">SECURE CHECKOUT</h2>
+        <h2 className="text-2xl font-bold mb-6 tracking-wide text-white">SECURE CHECKOUT</h2>
         
         <CheckoutForm 
             onSubmit={onSubmit} 

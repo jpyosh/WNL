@@ -5,6 +5,7 @@ import { ProductCard } from '../components/ProductCard';
 import { CartDrawer } from '../components/CartDrawer';
 import { CheckoutModal } from '../components/CheckoutModal';
 import { ReceiptModal } from '../components/ReceiptModal';
+import { ProductDetailsModal } from '../components/ProductDetailsModal';
 import { Product, CartItem, OrderForm } from '../types';
 import { api } from '../services/api';
 import { Loader2 } from 'lucide-react';
@@ -24,6 +25,7 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [currentOrderId, setCurrentOrderId] = useState<string>('');
 
   // Initial Data Fetch
@@ -124,7 +126,8 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
                 <ProductCard 
                   key={product.id} 
                   product={product} 
-                  onAddToCart={addToCart} 
+                  onAddToCart={addToCart}
+                  onClick={(p) => setSelectedProduct(p)}
                 />
               ))}
             </div>
@@ -161,6 +164,13 @@ const Shop: React.FC<ShopProps> = ({ onAdminClick }) => {
         orderId={currentOrderId}
         onUpload={handleReceiptUpload}
         onClose={() => setIsReceiptOpen(false)}
+      />
+
+      <ProductDetailsModal 
+        isOpen={!!selectedProduct}
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onAddToCart={addToCart}
       />
     </div>
   );

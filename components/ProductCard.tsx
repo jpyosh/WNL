@@ -5,13 +5,17 @@ import { Plus } from 'lucide-react';
 interface ProductCardProps {
   product: Product;
   onAddToCart: (product: Product) => void;
+  onClick: (product: Product) => void;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, onClick }) => {
   const isSoldOut = product.stock_quantity <= 0;
 
   return (
-    <div className="group relative bg-brand-dark border border-white/5 overflow-hidden flex flex-col transition-all duration-300 hover:border-white/20">
+    <div 
+      onClick={() => onClick(product)}
+      className="group relative bg-brand-dark border border-white/5 overflow-hidden flex flex-col transition-all duration-300 hover:border-white/20 cursor-pointer"
+    >
       {/* Image Container */}
       <div className="relative aspect-square overflow-hidden bg-gray-900">
         <img 
@@ -30,8 +34,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }
 
         {!isSoldOut && (
           <button 
-            onClick={() => onAddToCart(product)}
-            className="absolute bottom-4 right-4 bg-white text-black p-3 rounded-full opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 shadow-lg hover:bg-gray-200"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToCart(product);
+            }}
+            className="absolute bottom-4 right-4 bg-white text-black p-3 rounded-full opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 shadow-lg hover:bg-gray-200 z-20"
             aria-label="Add to cart"
           >
             <Plus className="w-5 h-5" />
@@ -42,7 +49,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }
       {/* Info Container */}
       <div className="p-6 flex flex-col flex-grow">
         <div className="flex justify-between items-start mb-2">
-            <h3 className="text-lg font-medium text-white tracking-wide">{product.name}</h3>
+            <h3 className="text-lg font-medium text-white tracking-wide group-hover:text-gray-300 transition-colors">{product.name}</h3>
             <span className="text-white/80 font-semibold">₱{product.price.toLocaleString()}</span>
         </div>
         <p className="text-sm text-gray-500 mb-4 line-clamp-2 flex-grow">{product.description}</p>

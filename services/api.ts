@@ -29,17 +29,17 @@ export const api = {
     // Map DB columns to Order type
     return data.map((row: any) => ({
       id: row.id,
-      items: [], // Items are not fetched for the list view to save performance
+      items: [], 
       total: row.total_amount,
       customerDetails: {
         fullName: row.customer_name,
         address: row.customer_address,
-        contactNumber: row.customer_contact,
-        email: row.customer_email,
+        contactNumber: row.contact_number,
+        email: row.email,
         paymentMethod: row.payment_method,
       },
       status: row.status,
-      receiptUrl: row.receipt_url,
+      receiptUrl: row.payment_receipt_url || row.receipt_url, // Handle schema variation
       createdAt: row.created_at
     }));
   },
@@ -55,13 +55,15 @@ export const api = {
 
   createOrder: async (form: OrderForm, items: CartItem[], total: number): Promise<Order> => {
     // 1. Insert into 'orders' table
+    // Strictly matching the provided SQL Schema:
+    // customer_name, customer_address, contact_number, email, total_amount, payment_method, status
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert([{
         customer_name: form.fullName,
         customer_address: form.address,
-        customer_contact: form.contactNumber,
-        customer_email: form.email,
+        contact_number: form.contactNumber,
+        email: form.email,
         payment_method: form.paymentMethod,
         total_amount: total,
         status: 'pending'
@@ -76,7 +78,7 @@ export const api = {
       order_id: orderData.id,
       product_id: item.id,
       quantity: item.quantity,
-      price: item.price // Snapshot price at purchase time
+      price_at_purchase: item.price // Note: SQL schema uses price_at_purchase
     }));
 
     const { error: itemsError } = await supabase
@@ -93,7 +95,7 @@ export const api = {
       customerDetails: form,
       status: orderData.status,
       createdAt: orderData.created_at,
-      receiptUrl: orderData.receipt_url
+      receiptUrl: orderData.payment_receipt_url
     };
   },
 
@@ -115,11 +117,12 @@ export const api = {
       .getPublicUrl(filePath);
 
     // 3. Update Order record
+    // Use 'payment_receipt_url' based on SQL schema
     const { error: updateError } = await supabase
       .from('orders')
       .update({ 
-        receipt_url: publicUrl,
-        status: 'paid' // Auto-mark as paid/verification-pending on upload
+        payment_receipt_url: publicUrl,
+        status: 'paid'
       })
       .eq('id', orderId);
 

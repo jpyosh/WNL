@@ -103,7 +103,7 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({ onSubmit, isLoading,
           disabled={isLoading}
           className="w-full bg-white text-black py-4 font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {isLoading ? <Loader2 className="animate-spin w-5 h-5" /> : 'Confirm Order'}
+          {isLoading ? <Loader2 className="animate-spin w-5 h-5" /> : 'Proceed to Payment'}
         </button>
       </div>
     </form>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UploadCloud, CheckCircle, Loader2 } from 'lucide-react';
+import { UploadCloud, CheckCircle, Loader2, Copy, Wallet } from 'lucide-react';
 
 interface ReceiptModalProps {
   isOpen: boolean;
@@ -38,51 +38,86 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, orderId, onU
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/95 backdrop-blur-md" />
 
-      <div className="relative bg-brand-dark border border-white/10 w-full max-w-md p-8 text-center shadow-2xl animate-fade-in-up">
+      <div className="relative bg-brand-dark border border-white/10 w-full max-w-lg p-8 shadow-2xl animate-fade-in-up flex flex-col max-h-[90vh] overflow-y-auto">
         {!isSuccess ? (
           <>
-            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
-                <UploadCloud className="w-8 h-8 text-white" />
-            </div>
-            
-            <h2 className="text-2xl font-bold mb-2">UPLOAD RECEIPT</h2>
-            <p className="text-gray-400 mb-6 text-sm">
-                Order ID: <span className="font-mono text-white">{orderId}</span><br/>
-                Please upload a screenshot of your payment to verify your order.
-            </p>
-
-            <div className="border-2 border-dashed border-white/20 rounded-lg p-8 mb-6 hover:border-white/50 transition-colors relative">
-                <input 
-                    type="file" 
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                {file ? (
-                    <p className="text-white font-medium break-all">{file.name}</p>
-                ) : (
-                    <p className="text-gray-500 text-sm">Click to browse or drag file here</p>
-                )}
+            <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold tracking-wide text-white mb-2">PAYMENT & VERIFICATION</h2>
+                <p className="text-gray-400 text-sm">Order ID: <span className="font-mono text-white">{orderId}</span></p>
             </div>
 
-            <button 
-                onClick={handleSubmit}
-                disabled={!file || isUploading}
-                className="w-full bg-white text-black py-3 font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-                {isUploading ? <Loader2 className="animate-spin w-5 h-5" /> : 'Submit Receipt'}
-            </button>
+            {/* Payment Details Section */}
+            <div className="bg-white/5 border border-white/10 rounded-lg p-6 mb-8 text-center">
+                <div className="flex items-center justify-center gap-2 mb-4 text-blue-400">
+                    <Wallet className="w-5 h-5" />
+                    <span className="font-bold tracking-wider">GCASH PAYMENT</span>
+                </div>
+                
+                {/* QR Code */}
+                <div className="bg-white p-2 rounded-lg inline-block mb-4 max-w-[200px] w-full aspect-square">
+                     <img 
+                        src="/GCASH.jpg" 
+                        alt="GCash QR Code" 
+                        className="w-full h-full object-contain"
+                    />
+                </div>
+
+                <div className="space-y-1">
+                    <p className="text-gray-400 text-xs uppercase tracking-widest">Send Payment To</p>
+                    <p className="text-xl font-bold text-white">Jan Patrick Y.</p>
+                    <div className="flex items-center justify-center gap-2">
+                        <p className="text-lg font-mono text-white/90">0961 395 8412</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Upload Section */}
+            <div className="space-y-4">
+                <label className="block text-xs uppercase tracking-wider text-gray-500 text-center">
+                    Upload Payment Screenshot
+                </label>
+                
+                <div className="border-2 border-dashed border-white/20 rounded-lg p-6 hover:border-white/50 transition-colors relative text-center">
+                    <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    {file ? (
+                        <div className="flex flex-col items-center">
+                            <CheckCircle className="w-8 h-8 text-green-500 mb-2" />
+                            <p className="text-white font-medium break-all text-sm">{file.name}</p>
+                            <p className="text-gray-500 text-xs mt-1">Click to change</p>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center">
+                            <UploadCloud className="w-8 h-8 text-gray-500 mb-2" />
+                            <p className="text-gray-500 text-sm">Click to browse or drag file here</p>
+                        </div>
+                    )}
+                </div>
+
+                <button 
+                    onClick={handleSubmit}
+                    disabled={!file || isUploading}
+                    className="w-full bg-white text-black py-4 font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
+                >
+                    {isUploading ? <Loader2 className="animate-spin w-5 h-5" /> : 'Submit Receipt'}
+                </button>
+            </div>
           </>
         ) : (
-          <div className="py-8">
-            <CheckCircle className="w-20 h-20 text-green-500 mx-auto mb-6" />
-            <h2 className="text-2xl font-bold mb-4">ORDER COMPLETE</h2>
-            <p className="text-gray-400 mb-8">
-                Your receipt has been uploaded successfully. We will process your order shortly.
+          <div className="py-12 text-center">
+            <CheckCircle className="w-24 h-24 text-green-500 mx-auto mb-6" />
+            <h2 className="text-3xl font-bold mb-4 tracking-tighter">ORDER RECEIVED</h2>
+            <p className="text-gray-400 mb-8 leading-relaxed">
+                Thank you. Your receipt has been uploaded successfully.<br/>
+                We will verify your payment and ship your item soon.
             </p>
             <button 
                 onClick={onClose}
-                className="w-full border border-white text-white py-3 font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-colors"
+                className="w-full border border-white text-white py-4 font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-colors"
             >
                 Back to Shop
             </button>
